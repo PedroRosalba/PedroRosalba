@@ -5,7 +5,7 @@
 // `default-src 'none'`, so embedded fonts would be blocked.
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import opentype from 'opentype.js';
-import { interests, whoami, now } from './profile.mjs';
+import { whoami, now } from './profile.mjs';
 
 const OUT = new URL('../assets/', import.meta.url);
 mkdirSync(OUT, { recursive: true });
@@ -73,7 +73,6 @@ const T = {
   eyebrow: { font: F.mono, size: 10.5, tracking: 0.26, fill: C.ink3 },
   meta: { font: F.mono, size: 9, tracking: 0.18, fill: C.dim },
 };
-const caps = (list) => list.map((s) => s.toUpperCase()).join('  ·  ');
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 function rng(seed) {
@@ -165,25 +164,6 @@ function eclipse({ cx, cy, R, horizon, W, N = 300, reach = 40, id = 'e' }) {
   return { css, defs, body };
 }
 
-// Ground below the horizon: the website's faint violet fog.
-function ground({ W, H, horizon, id = 'g' }) {
-  return {
-    defs: `
-    <linearGradient id="${id}f" x1="0" y1="${horizon}" x2="0" y2="${H}" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#262238" stop-opacity=".7"/>
-      <stop offset=".4" stop-color="#121019" stop-opacity=".6"/>
-      <stop offset="1" stop-color="${C.bg}"/>
-    </linearGradient>
-    <linearGradient id="${id}h" x1="0" y1="${horizon - 30}" x2="0" y2="${horizon + 4}" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="${C.bg}" stop-opacity="0"/>
-      <stop offset="1" stop-color="#1b1928" stop-opacity=".85"/>
-    </linearGradient>`,
-    body: `<rect y="${horizon - 30}" width="${W}" height="34" fill="url(#${id}h)"/>
-  <rect y="${horizon}" width="${W}" height="${H - horizon}" fill="url(#${id}f)"/>
-  <line x1="0" y1="${horizon + 0.5}" x2="${W}" y2="${horizon + 0.5}" stroke="${C.halo}" stroke-opacity=".08"/>`,
-  };
-}
-
 // ── tiles ────────────────────────────────────────────────────────────────────
 // Everything is a tile: 420 wide and placed at width="419" two to a line: a 2-up grid in
 // GitHub's 846px profile column that wraps to one column on phones — and,
@@ -192,19 +172,40 @@ const TW = 420, TL = 28;
 const BLURB = { size: 14 };
 const LH = 21;
 
-// ── hero: a diptych ──────────────────────────────────────────────────────────
-// Two 420-wide panels that share one scene. Side by side on desktop the gutter
-// reads as a mullion; on a phone they stack into a poster. The identity panel
-// carries the spill of the eclipse's halo so the scene stays continuous.
-const HERO_H = 400, HORIZON = 318, GAP = 4;
+// ── one scene, four panels ───────────────────────────────────────────────────
+// A 2×2 grid: identity | eclipse over terminal panes. Side by side on desktop
+// the gutters read as mullions; on a phone the panels stack into a poster. The
+// floor fog and the eclipse's glow are drawn in scene coordinates and carried
+// across panels, so the grid reads as one window onto one scene.
+const HERO_H = 360, HORIZON = 318, GAP = 4, VGAP = 5, PANE_H = 334;
+const FLOOR = 230; // how far below the horizon the fog fades out
+
+// Fog below the horizon, in scene coordinates; `top` is the panel's scene y.
+function floor(id, top, h) {
+  const y1 = HORIZON - top, y2 = y1 + FLOOR;
+  return {
+    defs: `<linearGradient id="${id}" x1="0" y1="${y1}" x2="0" y2="${y2}" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#262238" stop-opacity=".7"/><stop offset=".25" stop-color="#16141f" stop-opacity=".6"/><stop offset="1" stop-color="#0b0a10" stop-opacity="0"/></linearGradient>`,
+    body: `<rect y="${Math.max(0, y1)}" width="${TW}" height="${h - Math.max(0, y1)}" fill="url(#${id})"/>`,
+  };
+}
+
+// The eclipse's light pooling on the floor beneath it (right column only).
+function pool(id, top) {
+  const cy = HORIZON - top;
+  return {
+    defs: `<radialGradient id="${id}" cx="${ECL.cx}" cy="${cy}" r="${ECL.R * 1.9}" gradientTransform="translate(0 ${cy}) scale(1 .9) translate(0 ${-cy})" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="${C.accent}" stop-opacity=".2"/><stop offset=".55" stop-color="${C.accent}" stop-opacity=".05"/><stop offset="1" stop-color="${C.accent}" stop-opacity="0"/></radialGradient>`,
+    body: `<rect y="${Math.max(0, cy)}" width="${TW}" height="${ECL.R * 2}" fill="url(#${id})"/>`,
+  };
+}
 const ECL = { cx: 210, cy: 228, R: 104 };
 
 function heroIdentity() {
   const W = TW, H = HERO_H, L = TL;
-  const g = ground({ W, H, horizon: HORIZON });
+  const g = floor('fl', 0, H);
   const hx = W + GAP + ECL.cx;
   const sentence = wrap('I build software systems end to end — from low-level engines in Rust to AI tooling and on-chain applications.', BLURB, W - L * 2);
-  const tags = wrap(caps(interests), T.meta, W - L * 2);
   const rand = rng(5);
   const stars = Array.from({ length: 14 }, () =>
     `<circle cx="${r1(rand() * W)}" cy="${r1(12 + rand() * 120)}" r="${r1(0.3 + rand() * 0.5)}" fill="${C.ink}" opacity="${r1(0.08 + rand() * 0.22)}"/>`).join('');
@@ -222,20 +223,23 @@ function heroIdentity() {
   ${text('Pedro', { font: F.light, size: 60, x: L - 3, y: 146, tracking: -0.02 })}
   ${text('Rosalba', { font: F.light, size: 60, x: L - 3, y: 206, tracking: -0.02 })}
   ${sentence.map((l, i) => text(l, { ...BLURB, x: L, y: 248 + i * LH, fill: C.ink2 })).join('')}
-  ${tags.map((l, i) => text(l, { ...T.meta, x: L, y: H - 44 + i * 17 })).join('')}`;
+  <line x1="0" y1="${HORIZON + 0.5}" x2="${W}" y2="${HORIZON + 0.5}" stroke="${C.halo}" stroke-opacity=".08"/>`;
   save('hero-a.svg', svg(W, H, 'Pedro Rosalba — Software · AI · Systems', body));
 }
 
 function heroEclipse() {
   const W = TW, H = HERO_H;
   const e = eclipse({ ...ECL, horizon: HORIZON, W, N: 280, reach: 40 });
-  const g = ground({ W, H, horizon: HORIZON });
+  const g = floor('fl', 0, H);
+  const p = pool('pl', 0);
   const body = `
-  <defs><style>${e.css}${REDUCED}</style>${e.defs}${g.defs}</defs>
+  <defs><style>${e.css}${REDUCED}</style>${e.defs}${g.defs}${p.defs}</defs>
   <rect width="${W}" height="${H}" fill="${C.bg}"/>
   ${e.body}
-  ${g.body}`;
-  save('hero-b.svg', svg(W, H, 'An eclipse whose corona is drawn as an audio spectrum', body));
+  ${g.body}
+  ${p.body}
+  <line x1="0" y1="${HORIZON + 0.5}" x2="${W}" y2="${HORIZON + 0.5}" stroke="${C.halo}" stroke-opacity=".08"/>`;
+  save('hero-b.svg', svg(W, H, 'An eclipse rising over a dark horizon', body));
 }
 
 // ── terminal panes ───────────────────────────────────────────────────────────
@@ -256,8 +260,11 @@ function prompt(cmd, y, cursor = false) {
   return `${text(host, { ...MONO, x: TL, y, fill: C.halo })}${text(':~$', { ...MONO, x: TL + hw, y, fill: C.mute })}${cmd ? text(cmd, { ...MONO, x: TL + hw + sw, y }) : ''}${block}`;
 }
 
-function pane(file, title, cmd, rows, active = false) {
-  const W = TW, H = 300;
+function pane(file, title, cmd, rows, active = false, right = false) {
+  const W = TW, H = PANE_H;
+  const top = HERO_H + VGAP;
+  const g = floor('fl', top, H);
+  const p = right ? pool('pl', top) : null;
   const dot = measure('.', MONO);
   const lines = rows
     .map(([k, v], i) => {
@@ -272,8 +279,10 @@ function pane(file, title, cmd, rows, active = false) {
     })
     .join('');
   const body = `
-  ${active ? `<defs><style>.cur{animation:blink 1.1s steps(1) infinite}@keyframes blink{50%{opacity:0}}${REDUCED}</style></defs>` : ''}
+  <defs>${active ? `<style>.cur{animation:blink 1.1s steps(1) infinite}@keyframes blink{50%{opacity:0}}${REDUCED}</style>` : ''}${g.defs}${p ? p.defs : ''}</defs>
   <rect width="${W}" height="${H}" fill="${C.bg}"/>
+  ${g.body}
+  ${p ? p.body : ''}
   ${prompt(cmd, 44)}
   ${lines}
   ${prompt('', H - 30, active)}`;
@@ -283,4 +292,4 @@ function pane(file, title, cmd, rows, active = false) {
 heroIdentity();
 heroEclipse();
 pane('whoami.svg', 'whoami — Pedro Rosalba', 'whoami', whoami);
-pane('now.svg', 'cat ~/.now', 'cat ~/.now', now, true);
+pane('now.svg', 'cat ~/.now', 'cat ~/.now', now, true, true);
