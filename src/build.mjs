@@ -1,4 +1,4 @@
-// Renders every SVG in assets/ from src/projects.mjs + src/signals.json.
+// Renders every SVG in assets/ from src/projects.mjs.
 // Each piece has a desktop layout (900 wide, ~1:1 in GitHub's profile column) and a
 // mobile layout (420 wide), swapped by <picture media="(max-width: …)"> in README.md.
 // Text is converted to Geist / Geist Mono outlines: GitHub serves README SVGs with
@@ -7,7 +7,6 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import opentype from 'opentype.js';
 import { projects, interests } from './projects.mjs';
 
-const signals = JSON.parse(readFileSync(new URL('./signals.json', import.meta.url)));
 const OUT = new URL('../assets/', import.meta.url);
 mkdirSync(OUT, { recursive: true });
 
@@ -73,7 +72,6 @@ function wrap(str, opts, max) {
 const T = {
   eyebrow: { font: F.mono, size: 10.5, tracking: 0.26, fill: C.ink3 },
   meta: { font: F.mono, size: 9, tracking: 0.18, fill: C.dim },
-  path: { font: F.mono, size: 9, fill: C.mute },
 };
 const caps = (list) => list.map((s) => s.toUpperCase()).join('  ·  ');
 
@@ -186,29 +184,6 @@ function ground({ W, H, horizon, id = 'g' }) {
   };
 }
 
-// ── waveform: one bar per source line (bucketed by max when crowded) ────────
-function waveform(repo, { x, y, w, h, max = 200 }) {
-  const lines = signals[repo].lines;
-  const n = Math.min(lines.length, max, Math.floor(w / 2.2));
-  const per = lines.length / n;
-  const amps = Array.from({ length: n }, (_, i) => {
-    const a = Math.floor(i * per);
-    return Math.max(...lines.slice(a, Math.max(Math.floor((i + 1) * per), a + 1)));
-  });
-  // Normalise to the 95th percentile so one long line can't flatten the rest.
-  const sorted = [...amps].sort((p, q) => p - q);
-  const peak = Math.max(sorted[Math.floor(n * 0.95)], 1);
-  const step = w / n;
-  const bw = r1(Math.max(0.8, step * 0.5));
-  return amps
-    .map((v, i) => {
-      const k = Math.min(1, v / peak);
-      const hh = v === 0 ? 0.5 : r1(1 + Math.sqrt(k) * h);
-      return `<rect x="${r1(x + i * step)}" y="${r1(y - hh)}" width="${bw}" height="${r1(hh * 2)}"/>`;
-    })
-    .join('');
-}
-
 // ── tiles ────────────────────────────────────────────────────────────────────
 // Everything is a tile: 420 wide and placed at width="419" two to a line: a 2-up grid in
 // GitHub's 846px profile column that wraps to one column on phones — and,
@@ -264,14 +239,13 @@ function heroEclipse() {
 }
 
 // ── section label ────────────────────────────────────────────────────────────
-function label(file, left, note) {
-  const W = TW, H = 64, L = TL;
+function label(file, left) {
+  const W = TW, H = 48, L = TL;
   const style = { ...T.eyebrow, fill: C.dim };
   const body = `
   ${text(left, { ...style, x: L, y: 30 })}
-  <line x1="${r1(L + measure(left, style) + 16)}" y1="26.5" x2="${W - L}" y2="26.5" stroke="${C.dim}" stroke-opacity=".35"/>
-  ${text(note, { ...T.meta, fill: C.dim, x: L, y: 50 })}`;
-  save(file, svg(W, H, `${left}. ${note}`, body));
+  <line x1="${r1(L + measure(left, style) + 16)}" y1="26.5" x2="${W - L}" y2="26.5" stroke="${C.dim}" stroke-opacity=".35"/>`;
+  save(file, svg(W, H, left, body));
 }
 
 function releaseLayout(p) {
@@ -280,37 +254,23 @@ function releaseLayout(p) {
   return { blurb, stackY };
 }
 
-function release(p, H) {
-  const sig = signals[p.repo];
+// A project tile, laid out like the website's project panels: number, title,
+// description, stack, and the site's off-white "Open project" button.
+function release(p, n, H) {
   const { blurb, stackY } = releaseLayout(p);
-  const ww = TW - TL * 2, wy = H - 70, wh = 15;
-  const bars = waveform(p.repo, { x: TL, y: wy, w: ww, h: wh });
-  const DUR = 48;
-  const status = p.nowPlaying
-    ? `<circle class="live" cx="${r1(TW - TL - measure('NOW PLAYING', T.eyebrow) - 11)}" cy="40.4" r="2.6" fill="${C.accent}"/>
-  ${text('NOW PLAYING', { ...T.eyebrow, fill: C.ink, x: TW - TL, y: 44, anchor: 'end' })}`
-    : text('↗', { size: 15, x: TW - TL, y: 46, anchor: 'end', fill: C.dim });
-  const played = p.nowPlaying
-    ? `<g fill="${C.ink}" clip-path="url(#played)">${bars}</g>
-  <rect x="${TL}" y="${wy - wh - 7}" width="1" height="${wh * 2 + 14}" fill="${C.accent}"><animate attributeName="x" values="${TL};${TL + ww}" dur="${DUR}s" repeatCount="indefinite"/></rect>`
-    : '';
+  const num = String(n).padStart(2, '0');
+  const cta = 'Open project  →';
+  const ctaStyle = { size: 13.5, fill: C.bg };
+  const bw = r1(measure(cta, ctaStyle) + 44), bh = 38, by = H - TL - bh;
   const body = `
-  <defs><style>.live{animation:live 2.6s ease-in-out infinite}@keyframes live{0%,100%{opacity:1}50%{opacity:.2}}${REDUCED}</style>
-    ${p.nowPlaying ? `<clipPath id="played"><rect x="${TL}" y="0" width="0" height="${H}"><animate attributeName="width" values="0;${ww}" dur="${DUR}s" repeatCount="indefinite"/></rect></clipPath>` : ''}
-  </defs>
   <rect width="${TW}" height="${H}" fill="${C.bg}"/>
-  ${text(p.cat, { ...T.eyebrow, fill: C.halo, x: TL, y: 44 })}
-  ${text(p.year, { ...T.eyebrow, fill: C.mute, x: TL + 74, y: 44 })}
-  ${status}
+  ${text(`PROJECT ${num}`, { ...T.eyebrow, x: TL, y: 44 })}
   ${text(p.title, { font: F.light, size: 26, x: TL - 1, y: 90, tracking: -0.01 })}
   ${blurb.map((l, i) => text(l, { ...BLURB, x: TL, y: 124 + i * LH, fill: C.ink2 })).join('')}
-  ${text(caps(p.stack), { ...T.meta, x: TL, y: stackY })}
-  <g fill="${p.nowPlaying ? C.faint : '#4a4a54'}">${bars}</g>
-  ${played}
-  ${text(sig.source, { ...T.path, x: TL, y: H - 28 })}
-  ${text(`${sig.lines.length} lines`, { ...T.path, x: TW - TL, y: H - 28, anchor: 'end' })}`;
-  const file = `${p.cat.replace('—', '-').toLowerCase()}.svg`;
-  save(file, svg(TW, H, `${p.cat} ${p.title}${p.nowPlaying ? ' (now playing)' : ''}`, body));
+  ${text(p.stack.join(' · '), { font: F.mono, size: 10.5, x: TL, y: stackY, fill: C.ink3 })}
+  <rect x="${TL}" y="${by}" width="${bw}" height="${bh}" fill="${C.ink}"/>
+  ${text(cta, { ...ctaStyle, x: TL + 22, y: by + 24 })}`;
+  save(`project-${num}.svg`, svg(TW, H, `Project ${num} — ${p.title}`, body));
 }
 
 function about(H) {
@@ -380,9 +340,9 @@ function portal(H) {
 
 heroIdentity();
 heroEclipse();
-label('label-work.svg', '01 — SELECTED WORK', 'WAVEFORM = LINE LENGTHS OF ONE REAL SOURCE FILE');
+label('label-work.svg', '01 — SELECTED WORK');
 // Every release tile shares the tallest tile's height so the grid stays square.
-const H = Math.max(...projects.map((p) => releaseLayout(p).stackY)) + 112;
-projects.forEach((p) => release(p, H));
+const H = Math.max(...projects.map((p) => releaseLayout(p).stackY)) + 96;
+projects.forEach((p, i) => release(p, i + 1, H));
 about(H);
 portal(H);

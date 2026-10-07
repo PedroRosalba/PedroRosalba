@@ -2,8 +2,7 @@
   "name": "pedrorosalba",
   "description": "GitHub profile README \u2014 assets generated from source",
   "scripts": {
-    "build": "node src/build.mjs",
-    "sample": "node src/sample.mjs"
+    "build": "node src/build.mjs"
   },
   "type": "module",
   "devDependencies": {
