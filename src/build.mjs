@@ -233,7 +233,7 @@ function left() {
   const stars = Array.from({ length: 14 }, () =>
     `<circle cx="${r1(rand() * TW)}" cy="${r1(12 + rand() * 120)}" r="${r1(0.3 + rand() * 0.5)}" fill="${C.ink}" opacity="${r1(0.08 + rand() * 0.22)}"/>`).join('');
   const hx = TW + ECL.cx; // the eclipse sits in the next column; its halo spills here
-  const sentence = wrap('I build software systems end to end — from low-level engines in Rust to AI tooling and on-chain applications.', BLURB, TW - TL * 2);
+  const sentence = wrap('Drawn to low-level systems and core infrastructure — runtimes, cryptography, distributed and decentralized systems. The engines that move software.', BLURB, TW - TL * 2);
   const body = `
   <defs>${floor}${pool(hx)}
     <radialGradient id="spill" cx="${hx}" cy="${ECL.cy}" r="${ECL.R * 2.5}" gradientUnits="userSpaceOnUse">
