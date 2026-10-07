@@ -7,8 +7,6 @@ export const whoami = [
   ['role', 'Software · AI · Systems'],
   ['stack', 'Rust · TypeScript · Python · Go'],
   ['chains', 'EVM · Starknet'],
-  ['focus', 'distributed systems · cryptography'],
-  ['', 'protocols · infrastructure'],
   ['likes', 'problems where correctness matters'],
 ];
 
