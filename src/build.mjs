@@ -164,90 +164,37 @@ function eclipse({ cx, cy, R, horizon, W, N = 300, reach = 40, id = 'e' }) {
   return { css, defs, body };
 }
 
-// ── tiles ────────────────────────────────────────────────────────────────────
-// Everything is a tile: 420 wide and placed at width="419" two to a line: a 2-up grid in
-// GitHub's 846px profile column that wraps to one column on phones — and,
-// unlike <picture>, survives being wrapped in a link.
+// ── columns ──────────────────────────────────────────────────────────────────
+// The README is one scene drawn as two 420-wide columns, placed edge to edge at
+// width="419": identity over `whoami` on the left, the eclipse over `cat ~/.now`
+// on the right. On desktop they meet without a gap; on a phone they stack, and
+// each column still reads on its own. Images can't be split on GitHub without a
+// visible seam, so each column is one image from sky to terminal.
 const TW = 420, TL = 28;
 const BLURB = { size: 14 };
 const LH = 21;
-
-// ── one scene, four panels ───────────────────────────────────────────────────
-// A 2×2 grid: identity | eclipse over terminal panes. Side by side on desktop
-// the gutters read as mullions; on a phone the panels stack into a poster. The
-// floor fog and the eclipse's glow are drawn in scene coordinates and carried
-// across panels, so the grid reads as one window onto one scene.
-const HERO_H = 360, HORIZON = 318, GAP = 4, VGAP = 5, PANE_H = 334;
-const FLOOR = 230; // how far below the horizon the fog fades out
-
-// Fog below the horizon, in scene coordinates; `top` is the panel's scene y.
-function floor(id, top, h) {
-  const y1 = HORIZON - top, y2 = y1 + FLOOR;
-  return {
-    defs: `<linearGradient id="${id}" x1="0" y1="${y1}" x2="0" y2="${y2}" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#262238" stop-opacity=".7"/><stop offset=".25" stop-color="#16141f" stop-opacity=".6"/><stop offset="1" stop-color="#0b0a10" stop-opacity="0"/></linearGradient>`,
-    body: `<rect y="${Math.max(0, y1)}" width="${TW}" height="${h - Math.max(0, y1)}" fill="url(#${id})"/>`,
-  };
-}
-
-// The eclipse's light pooling on the floor beneath it (right column only).
-function pool(id, top) {
-  const cy = HORIZON - top;
-  return {
-    defs: `<radialGradient id="${id}" cx="${ECL.cx}" cy="${cy}" r="${ECL.R * 1.9}" gradientTransform="translate(0 ${cy}) scale(1 .9) translate(0 ${-cy})" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="${C.accent}" stop-opacity=".2"/><stop offset=".55" stop-color="${C.accent}" stop-opacity=".05"/><stop offset="1" stop-color="${C.accent}" stop-opacity="0"/></radialGradient>`,
-    body: `<rect y="${Math.max(0, cy)}" width="${TW}" height="${ECL.R * 2}" fill="url(#${id})"/>`,
-  };
-}
-const ECL = { cx: 210, cy: 228, R: 104 };
-
-function heroIdentity() {
-  const W = TW, H = HERO_H, L = TL;
-  const g = floor('fl', 0, H);
-  const hx = W + GAP + ECL.cx;
-  const sentence = wrap('I build software systems end to end — from low-level engines in Rust to AI tooling and on-chain applications.', BLURB, W - L * 2);
-  const rand = rng(5);
-  const stars = Array.from({ length: 14 }, () =>
-    `<circle cx="${r1(rand() * W)}" cy="${r1(12 + rand() * 120)}" r="${r1(0.3 + rand() * 0.5)}" fill="${C.ink}" opacity="${r1(0.08 + rand() * 0.22)}"/>`).join('');
-  const body = `
-  <defs>${g.defs}
-    <radialGradient id="spill" cx="${hx}" cy="${ECL.cy}" r="${ECL.R * 2.5}" gradientUnits="userSpaceOnUse">
-      <stop offset=".4" stop-color="${C.accent}" stop-opacity=".24"/><stop offset=".62" stop-color="${C.accent}" stop-opacity=".05"/><stop offset="1" stop-color="${C.accent}" stop-opacity="0"/>
-    </radialGradient>
-  </defs>
-  <rect width="${W}" height="${H}" fill="${C.bg}"/>
-  ${stars}
-  <rect width="${W}" height="${HORIZON}" fill="url(#spill)"/>
-  ${g.body}
-  ${text('SOFTWARE · AI · SYSTEMS', { ...T.eyebrow, x: L, y: 76 })}
-  ${text('Pedro', { font: F.light, size: 60, x: L - 3, y: 146, tracking: -0.02 })}
-  ${text('Rosalba', { font: F.light, size: 60, x: L - 3, y: 206, tracking: -0.02 })}
-  ${sentence.map((l, i) => text(l, { ...BLURB, x: L, y: 248 + i * LH, fill: C.ink2 })).join('')}
-  <line x1="0" y1="${HORIZON + 0.5}" x2="${W}" y2="${HORIZON + 0.5}" stroke="${C.halo}" stroke-opacity=".08"/>`;
-  save('hero-a.svg', svg(W, H, 'Pedro Rosalba — Software · AI · Systems', body));
-}
-
-function heroEclipse() {
-  const W = TW, H = HERO_H;
-  const e = eclipse({ ...ECL, horizon: HORIZON, W, N: 280, reach: 40 });
-  const g = floor('fl', 0, H);
-  const p = pool('pl', 0);
-  const body = `
-  <defs><style>${e.css}${REDUCED}</style>${e.defs}${g.defs}${p.defs}</defs>
-  <rect width="${W}" height="${H}" fill="${C.bg}"/>
-  ${e.body}
-  ${g.body}
-  ${p.body}
-  <line x1="0" y1="${HORIZON + 0.5}" x2="${W}" y2="${HORIZON + 0.5}" stroke="${C.halo}" stroke-opacity=".08"/>`;
-  save('hero-b.svg', svg(W, H, 'An eclipse rising over a dark horizon', body));
-}
-
-// ── terminal panes ───────────────────────────────────────────────────────────
-// Two panes of one tmux-style split, under the hero: `whoami` and `cat ~/.now`;
-// only the active (right) pane has a cursor.
-// Keys, dot leaders, right-aligned values — set in Geist Mono like the site.
 const MONO = { font: F.mono, size: 12 };
 const ROW = 22;
+
+const HERO_H = 344, HORIZON = 300;
+const FLOOR = 300; // how far below the horizon the fog fades out
+const ECL = { cx: 210, cy: 210, R: 104 };
+
+function rowsHeight(rows) {
+  return 44 + 38 + (rows.length - 1) * ROW + 46 + 34;
+}
+const PANE_H = Math.max(rowsHeight(whoami), rowsHeight(now));
+const H = HERO_H + PANE_H;
+
+// Fog below the horizon, and the eclipse's light pooling on the floor beneath it.
+const floor = `<linearGradient id="fl" x1="0" y1="${HORIZON}" x2="0" y2="${HORIZON + FLOOR}" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#262238" stop-opacity=".75"/><stop offset=".22" stop-color="#16141f" stop-opacity=".6"/><stop offset="1" stop-color="#0b0a10" stop-opacity="0"/></linearGradient>`;
+const pool = (cx) => `<radialGradient id="pl" cx="${cx}" cy="${HORIZON}" r="${ECL.R * 2.1}" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="${C.accent}" stop-opacity=".2"/><stop offset=".55" stop-color="${C.accent}" stop-opacity=".05"/><stop offset="1" stop-color="${C.accent}" stop-opacity="0"/></radialGradient>`;
+const ground = () => `
+  <rect y="${HORIZON}" width="${TW}" height="${H - HORIZON}" fill="url(#fl)"/>
+  <rect y="${HORIZON}" width="${TW}" height="${ECL.R * 2.2}" fill="url(#pl)"/>
+  <line x1="0" y1="${HORIZON + 0.5}" x2="${TW}" y2="${HORIZON + 0.5}" stroke="${C.halo}" stroke-opacity=".08"/>`;
 
 function prompt(cmd, y, cursor = false) {
   const host = 'pedro@rosalba';
@@ -260,36 +207,61 @@ function prompt(cmd, y, cursor = false) {
   return `${text(host, { ...MONO, x: TL, y, fill: C.halo })}${text(':~$', { ...MONO, x: TL + hw, y, fill: C.mute })}${cmd ? text(cmd, { ...MONO, x: TL + hw + sw, y }) : ''}${block}`;
 }
 
-function pane(file, title, cmd, rows, active = false, right = false) {
-  const W = TW, H = PANE_H;
-  const top = HERO_H + VGAP;
-  const g = floor('fl', top, H);
-  const p = right ? pool('pl', top) : null;
+// A terminal pane: keys, dot leaders, right-aligned values, set in Geist Mono.
+function pane(cmd, rows, active) {
+  const y0 = HERO_H + 44;
   const dot = measure('.', MONO);
   const lines = rows
     .map(([k, v], i) => {
-      const y = 82 + i * ROW;
+      const y = y0 + 38 + i * ROW;
       const vw = measure(v, MONO);
-      if (!k) return text(v, { ...MONO, x: W - TL, y, anchor: 'end', fill: C.ink2 });
+      if (!k) return text(v, { ...MONO, x: TW - TL, y, anchor: 'end', fill: C.ink2 });
       const kw = measure(k, MONO);
-      const n = Math.max(2, Math.floor((W - TL * 2 - kw - vw - 16) / dot));
+      const n = Math.max(2, Math.floor((TW - TL * 2 - kw - vw - 16) / dot));
       return text(k, { ...MONO, x: TL, y, fill: C.ink3 })
         + text('.'.repeat(n), { ...MONO, x: TL + kw + 8, y, fill: C.faint })
-        + text(v, { ...MONO, x: W - TL, y, anchor: 'end' });
+        + text(v, { ...MONO, x: TW - TL, y, anchor: 'end' });
     })
     .join('');
-  const body = `
-  <defs>${active ? `<style>.cur{animation:blink 1.1s steps(1) infinite}@keyframes blink{50%{opacity:0}}${REDUCED}</style>` : ''}${g.defs}${p ? p.defs : ''}</defs>
-  <rect width="${W}" height="${H}" fill="${C.bg}"/>
-  ${g.body}
-  ${p ? p.body : ''}
-  ${prompt(cmd, 44)}
-  ${lines}
-  ${prompt('', H - 30, active)}`;
-  save(file, svg(W, H, title, body));
+  return `${prompt(cmd, y0)}${lines}${prompt('', H - 34, active)}`;
 }
 
-heroIdentity();
-heroEclipse();
-pane('whoami.svg', 'whoami — Pedro Rosalba', 'whoami', whoami);
-pane('now.svg', 'cat ~/.now', 'cat ~/.now', now, true, true);
+const CURSOR = `.cur{animation:blink 1.1s steps(1) infinite}@keyframes blink{50%{opacity:0}}`;
+
+function left() {
+  const rand = rng(5);
+  const stars = Array.from({ length: 14 }, () =>
+    `<circle cx="${r1(rand() * TW)}" cy="${r1(12 + rand() * 120)}" r="${r1(0.3 + rand() * 0.5)}" fill="${C.ink}" opacity="${r1(0.08 + rand() * 0.22)}"/>`).join('');
+  const hx = TW + ECL.cx; // the eclipse sits in the next column; its halo spills here
+  const sentence = wrap('I build software systems end to end — from low-level engines in Rust to AI tooling and on-chain applications.', BLURB, TW - TL * 2);
+  const body = `
+  <defs>${floor}${pool(hx)}
+    <radialGradient id="spill" cx="${hx}" cy="${ECL.cy}" r="${ECL.R * 2.5}" gradientUnits="userSpaceOnUse">
+      <stop offset=".4" stop-color="${C.accent}" stop-opacity=".24"/><stop offset=".62" stop-color="${C.accent}" stop-opacity=".05"/><stop offset="1" stop-color="${C.accent}" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="${TW}" height="${H}" fill="${C.bg}"/>
+  ${stars}
+  <rect width="${TW}" height="${HORIZON}" fill="url(#spill)"/>
+  ${ground()}
+  ${text('SOFTWARE · AI · SYSTEMS', { ...T.eyebrow, x: TL, y: 68 })}
+  ${text('Pedro', { font: F.light, size: 60, x: TL - 3, y: 138, tracking: -0.02 })}
+  ${text('Rosalba', { font: F.light, size: 60, x: TL - 3, y: 198, tracking: -0.02 })}
+  ${sentence.map((l, i) => text(l, { ...BLURB, x: TL, y: 240 + i * LH, fill: C.ink2 })).join('')}
+  ${pane('whoami', whoami, false)}`;
+  save('left.svg', svg(TW, H, 'Pedro Rosalba — Software · AI · Systems', body));
+}
+
+function right() {
+  const e = eclipse({ ...ECL, horizon: HORIZON, W: TW, N: 280, reach: 40 });
+  const body = `
+  <defs><style>${e.css}${CURSOR}${REDUCED}</style>${e.defs}${floor}${pool(ECL.cx)}</defs>
+  <rect width="${TW}" height="${H}" fill="${C.bg}"/>
+  ${e.body}
+  ${ground()}
+  ${pane('cat ~/.now', now, true)}`;
+  save('right.svg', svg(TW, H, 'An eclipse over a dark horizon, and what Pedro is building now', body));
+}
+
+left();
+right();

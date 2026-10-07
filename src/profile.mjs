@@ -9,8 +9,6 @@ export const whoami = [
   ['chains', 'EVM · Starknet'],
   ['focus', 'distributed systems · cryptography'],
   ['', 'protocols · infrastructure'],
-  ['into', 'payments · financial infrastructure'],
-  ['', 'blockchain · decentralized systems'],
   ['likes', 'problems where correctness matters'],
 ];
 
@@ -19,9 +17,6 @@ export const now = [
   ['', 'e2e testing · devtools'],
   ['next', 'the future of automated,'],
   ['', 'scalable and efficient software'],
-  ['shipped', 'a payment engine in Rust'],
-  ['', 'stealth payments on Starknet'],
-  ['', 'co-op space invaders on CRDTs'],
   ['web', 'my-personal-website-gilt-two.vercel.app'],
   ['github', '@PedroRosalba'],
 ];
