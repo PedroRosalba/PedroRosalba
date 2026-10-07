@@ -15,6 +15,7 @@ export const now = [
   ['', 'e2e testing · devtools'],
   ['next', 'the future of automated,'],
   ['', 'scalable and efficient software'],
+  ['try', '/rosalbito — a claude code plugin'],
   ['web', 'my-personal-website-gilt-two.vercel.app'],
   ['github', '@PedroRosalba'],
 ];
