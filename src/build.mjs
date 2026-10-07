@@ -1,11 +1,11 @@
-// Renders every SVG in assets/ from src/projects.mjs.
+// Renders every SVG in assets/ from src/profile.mjs.
 // Each piece has a desktop layout (900 wide, ~1:1 in GitHub's profile column) and a
 // mobile layout (420 wide), swapped by <picture media="(max-width: …)"> in README.md.
 // Text is converted to Geist / Geist Mono outlines: GitHub serves README SVGs with
 // `default-src 'none'`, so embedded fonts would be blocked.
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import opentype from 'opentype.js';
-import { projects, interests } from './projects.mjs';
+import { whoami, now } from './profile.mjs';
 
 const OUT = new URL('../assets/', import.meta.url);
 mkdirSync(OUT, { recursive: true });
@@ -73,7 +73,6 @@ const T = {
   eyebrow: { font: F.mono, size: 10.5, tracking: 0.26, fill: C.ink3 },
   meta: { font: F.mono, size: 9, tracking: 0.18, fill: C.dim },
 };
-const caps = (list) => list.map((s) => s.toUpperCase()).join('  ·  ');
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 function rng(seed) {
@@ -165,25 +164,6 @@ function eclipse({ cx, cy, R, horizon, W, N = 300, reach = 40, id = 'e' }) {
   return { css, defs, body };
 }
 
-// Ground below the horizon: the website's faint violet fog.
-function ground({ W, H, horizon, id = 'g' }) {
-  return {
-    defs: `
-    <linearGradient id="${id}f" x1="0" y1="${horizon}" x2="0" y2="${H}" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#262238" stop-opacity=".7"/>
-      <stop offset=".4" stop-color="#121019" stop-opacity=".6"/>
-      <stop offset="1" stop-color="${C.bg}"/>
-    </linearGradient>
-    <linearGradient id="${id}h" x1="0" y1="${horizon - 30}" x2="0" y2="${horizon + 4}" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="${C.bg}" stop-opacity="0"/>
-      <stop offset="1" stop-color="#1b1928" stop-opacity=".85"/>
-    </linearGradient>`,
-    body: `<rect y="${horizon - 30}" width="${W}" height="34" fill="url(#${id}h)"/>
-  <rect y="${horizon}" width="${W}" height="${H - horizon}" fill="url(#${id}f)"/>
-  <line x1="0" y1="${horizon + 0.5}" x2="${W}" y2="${horizon + 0.5}" stroke="${C.halo}" stroke-opacity=".08"/>`,
-  };
-}
-
 // ── tiles ────────────────────────────────────────────────────────────────────
 // Everything is a tile: 420 wide and placed at width="419" two to a line: a 2-up grid in
 // GitHub's 846px profile column that wraps to one column on phones — and,
@@ -192,19 +172,40 @@ const TW = 420, TL = 28;
 const BLURB = { size: 14 };
 const LH = 21;
 
-// ── hero: a diptych ──────────────────────────────────────────────────────────
-// Two 420-wide panels that share one scene. Side by side on desktop the gutter
-// reads as a mullion; on a phone they stack into a poster. The identity panel
-// carries the spill of the eclipse's halo so the scene stays continuous.
-const HERO_H = 400, HORIZON = 318, GAP = 4;
+// ── one scene, four panels ───────────────────────────────────────────────────
+// A 2×2 grid: identity | eclipse over terminal panes. Side by side on desktop
+// the gutters read as mullions; on a phone the panels stack into a poster. The
+// floor fog and the eclipse's glow are drawn in scene coordinates and carried
+// across panels, so the grid reads as one window onto one scene.
+const HERO_H = 360, HORIZON = 318, GAP = 4, VGAP = 5, PANE_H = 334;
+const FLOOR = 230; // how far below the horizon the fog fades out
+
+// Fog below the horizon, in scene coordinates; `top` is the panel's scene y.
+function floor(id, top, h) {
+  const y1 = HORIZON - top, y2 = y1 + FLOOR;
+  return {
+    defs: `<linearGradient id="${id}" x1="0" y1="${y1}" x2="0" y2="${y2}" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#262238" stop-opacity=".7"/><stop offset=".25" stop-color="#16141f" stop-opacity=".6"/><stop offset="1" stop-color="#0b0a10" stop-opacity="0"/></linearGradient>`,
+    body: `<rect y="${Math.max(0, y1)}" width="${TW}" height="${h - Math.max(0, y1)}" fill="url(#${id})"/>`,
+  };
+}
+
+// The eclipse's light pooling on the floor beneath it (right column only).
+function pool(id, top) {
+  const cy = HORIZON - top;
+  return {
+    defs: `<radialGradient id="${id}" cx="${ECL.cx}" cy="${cy}" r="${ECL.R * 1.9}" gradientTransform="translate(0 ${cy}) scale(1 .9) translate(0 ${-cy})" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="${C.accent}" stop-opacity=".2"/><stop offset=".55" stop-color="${C.accent}" stop-opacity=".05"/><stop offset="1" stop-color="${C.accent}" stop-opacity="0"/></radialGradient>`,
+    body: `<rect y="${Math.max(0, cy)}" width="${TW}" height="${ECL.R * 2}" fill="url(#${id})"/>`,
+  };
+}
 const ECL = { cx: 210, cy: 228, R: 104 };
 
 function heroIdentity() {
   const W = TW, H = HERO_H, L = TL;
-  const g = ground({ W, H, horizon: HORIZON });
+  const g = floor('fl', 0, H);
   const hx = W + GAP + ECL.cx;
   const sentence = wrap('I build software systems end to end — from low-level engines in Rust to AI tooling and on-chain applications.', BLURB, W - L * 2);
-  const tags = wrap(caps(interests), T.meta, W - L * 2);
   const rand = rng(5);
   const stars = Array.from({ length: 14 }, () =>
     `<circle cx="${r1(rand() * W)}" cy="${r1(12 + rand() * 120)}" r="${r1(0.3 + rand() * 0.5)}" fill="${C.ink}" opacity="${r1(0.08 + rand() * 0.22)}"/>`).join('');
@@ -222,127 +223,73 @@ function heroIdentity() {
   ${text('Pedro', { font: F.light, size: 60, x: L - 3, y: 146, tracking: -0.02 })}
   ${text('Rosalba', { font: F.light, size: 60, x: L - 3, y: 206, tracking: -0.02 })}
   ${sentence.map((l, i) => text(l, { ...BLURB, x: L, y: 248 + i * LH, fill: C.ink2 })).join('')}
-  ${tags.map((l, i) => text(l, { ...T.meta, x: L, y: H - 44 + i * 17 })).join('')}`;
+  <line x1="0" y1="${HORIZON + 0.5}" x2="${W}" y2="${HORIZON + 0.5}" stroke="${C.halo}" stroke-opacity=".08"/>`;
   save('hero-a.svg', svg(W, H, 'Pedro Rosalba — Software · AI · Systems', body));
 }
 
 function heroEclipse() {
   const W = TW, H = HERO_H;
   const e = eclipse({ ...ECL, horizon: HORIZON, W, N: 280, reach: 40 });
-  const g = ground({ W, H, horizon: HORIZON });
+  const g = floor('fl', 0, H);
+  const p = pool('pl', 0);
   const body = `
-  <defs><style>${e.css}${REDUCED}</style>${e.defs}${g.defs}</defs>
+  <defs><style>${e.css}${REDUCED}</style>${e.defs}${g.defs}${p.defs}</defs>
   <rect width="${W}" height="${H}" fill="${C.bg}"/>
   ${e.body}
-  ${g.body}`;
-  save('hero-b.svg', svg(W, H, 'An eclipse whose corona is drawn as an audio spectrum', body));
+  ${g.body}
+  ${p.body}
+  <line x1="0" y1="${HORIZON + 0.5}" x2="${W}" y2="${HORIZON + 0.5}" stroke="${C.halo}" stroke-opacity=".08"/>`;
+  save('hero-b.svg', svg(W, H, 'An eclipse rising over a dark horizon', body));
 }
 
-// ── section label ────────────────────────────────────────────────────────────
-function label(file, left) {
-  const W = TW, H = 48, L = TL;
-  const style = { ...T.eyebrow, fill: C.dim };
-  const body = `
-  ${text(left, { ...style, x: L, y: 30 })}
-  <line x1="${r1(L + measure(left, style) + 16)}" y1="26.5" x2="${W - L}" y2="26.5" stroke="${C.dim}" stroke-opacity=".35"/>`;
-  save(file, svg(W, H, left, body));
+// ── terminal panes ───────────────────────────────────────────────────────────
+// Two panes of one tmux-style split, under the hero: `whoami` and `cat ~/.now`;
+// only the active (right) pane has a cursor.
+// Keys, dot leaders, right-aligned values — set in Geist Mono like the site.
+const MONO = { font: F.mono, size: 12 };
+const ROW = 22;
+
+function prompt(cmd, y, cursor = false) {
+  const host = 'pedro@rosalba';
+  const hw = measure(host, MONO);
+  const sw = measure(':~$ ', MONO);
+  const cw = measure(cmd, MONO);
+  const block = cursor
+    ? `<rect class="cur" x="${r1(TL + hw + sw + cw + (cmd ? 4 : 0))}" y="${y - 10}" width="7" height="13" fill="${C.ink}"/>`
+    : '';
+  return `${text(host, { ...MONO, x: TL, y, fill: C.halo })}${text(':~$', { ...MONO, x: TL + hw, y, fill: C.mute })}${cmd ? text(cmd, { ...MONO, x: TL + hw + sw, y }) : ''}${block}`;
 }
 
-function releaseLayout(p) {
-  const blurb = wrap(p.blurb, BLURB, TW - TL * 2);
-  const stackY = 124 + (blurb.length - 1) * LH + 32;
-  return { blurb, stackY };
-}
-
-// A project tile, laid out like the website's project panels: number, title,
-// description, stack, and the site's off-white "Open project" button.
-function release(p, n, H) {
-  const { blurb, stackY } = releaseLayout(p);
-  const num = String(n).padStart(2, '0');
-  const cta = 'Open project  →';
-  const ctaStyle = { size: 13.5, fill: C.bg };
-  const bw = r1(measure(cta, ctaStyle) + 44), bh = 38, by = H - TL - bh;
-  const body = `
-  <rect width="${TW}" height="${H}" fill="${C.bg}"/>
-  ${text(`PROJECT ${num}`, { ...T.eyebrow, x: TL, y: 44 })}
-  ${text(p.title, { font: F.light, size: 26, x: TL - 1, y: 90, tracking: -0.01 })}
-  ${blurb.map((l, i) => text(l, { ...BLURB, x: TL, y: 124 + i * LH, fill: C.ink2 })).join('')}
-  ${text(p.stack.join(' · '), { font: F.mono, size: 10.5, x: TL, y: stackY, fill: C.ink3 })}
-  <rect x="${TL}" y="${by}" width="${bw}" height="${bh}" fill="${C.ink}"/>
-  ${text(cta, { ...ctaStyle, x: TL + 22, y: by + 24 })}`;
-  save(`project-${num}.svg`, svg(TW, H, `Project ${num} — ${p.title}`, body));
-}
-
-function about(H) {
-  const lines = wrap(
-    "I'm a software engineer who likes problems where correctness matters: payment engines, protocol integrations and the tooling around AI agents.",
-    BLURB,
-    TW - TL * 2,
-  );
-  const body = `
-  <rect width="${TW}" height="${H}" fill="${C.bg}"/>
-  ${text('02 — ABOUT', { ...T.eyebrow, x: TL, y: 44 })}
-  ${text('↗', { size: 15, x: TW - TL, y: 46, anchor: 'end', fill: C.dim })}
-  ${text('Systems thinking,', { font: F.light, size: 26, x: TL - 1, y: 90, tracking: -0.01 })}
-  ${text('applied across the stack.', { font: F.light, size: 26, x: TL - 1, y: 122, tracking: -0.01 })}
-  ${lines.map((l, i) => text(l, { ...BLURB, x: TL, y: 156 + i * LH, fill: C.ink2 })).join('')}
-  <line x1="${TL}" y1="${H - 84}" x2="${TW - TL}" y2="${H - 84}" stroke="${C.line}"/>
-  ${text('OPEN TO', { ...T.meta, x: TL, y: H - 58 })}
-  ${text('Conversations about software, AI and systems work.', { ...BLURB, x: TL, y: H - 32, fill: C.ink })}`;
-  save('about.svg', svg(TW, H, 'About — systems thinking, applied across the stack', body));
-}
-
-// The README ends at a door into the website, as the website's own walkway does.
-function portal(H) {
-  const vx = TW / 2, horizon = Math.round(H * 0.5);
-  const aw = 30, ah = 54, top = horizon - ah + aw / 2;
-  const arch = (o) => `M${vx - aw / 2 - o} ${horizon} V${top} A${aw / 2 + o} ${aw / 2 + o} 0 0 1 ${vx + aw / 2 + o} ${top} V${horizon}`;
-  const g = ground({ W: TW, H, horizon, id: 'p' });
-  const spread = 120;
-  const slats = [0.14, 0.32, 0.56, 0.86]
-    .map((t) => {
-      const y = horizon + t * (H - horizon), hw = 7 + t * (spread - 7);
-      return `<line x1="${r1(vx - hw)}" y1="${r1(y)}" x2="${r1(vx + hw)}" y2="${r1(y)}" stroke="${C.bg}" stroke-width="${r1(0.6 + t * 1.6)}"/>`;
+function pane(file, title, cmd, rows, active = false, right = false) {
+  const W = TW, H = PANE_H;
+  const top = HERO_H + VGAP;
+  const g = floor('fl', top, H);
+  const p = right ? pool('pl', top) : null;
+  const dot = measure('.', MONO);
+  const lines = rows
+    .map(([k, v], i) => {
+      const y = 82 + i * ROW;
+      const vw = measure(v, MONO);
+      if (!k) return text(v, { ...MONO, x: W - TL, y, anchor: 'end', fill: C.ink2 });
+      const kw = measure(k, MONO);
+      const n = Math.max(2, Math.floor((W - TL * 2 - kw - vw - 16) / dot));
+      return text(k, { ...MONO, x: TL, y, fill: C.ink3 })
+        + text('.'.repeat(n), { ...MONO, x: TL + kw + 8, y, fill: C.faint })
+        + text(v, { ...MONO, x: W - TL, y, anchor: 'end' });
     })
     .join('');
-  const fy = horizon + (H - horizon) * 0.42;
-  const walker = `<g fill="#8d8b94" transform="translate(${vx} ${r1(fy)})">
-    <circle cx="0" cy="-24" r="3"/><rect x="-3.2" y="-20" width="6.4" height="13.5" rx="1.8"/>
-    <rect x="-3" y="-7.5" width="2.5" height="12.5" rx="1.1"/><rect x="0.5" y="-7.5" width="2.5" height="12.5" rx="1.1"/></g>`;
   const body = `
-  <defs><style>.glow{animation:glow 7s ease-in-out infinite}@keyframes glow{0%,100%{opacity:.7}50%{opacity:1}}${REDUCED}</style>
-    ${g.defs}
-    <linearGradient id="pp" x1="0" y1="${horizon}" x2="0" y2="${H}" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#2c2a3b"/><stop offset="1" stop-color="#0c0c11"/></linearGradient>
-    <linearGradient id="pm" x1="0" y1="0" x2="0" y2="${horizon}" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#0d0d14" stop-opacity="0"/><stop offset=".5" stop-color="#0d0d14"/><stop offset="1" stop-color="#12121b"/></linearGradient>
-    <linearGradient id="pd" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f2eeff"/><stop offset="1" stop-color="#8f7cff"/></linearGradient>
-    <radialGradient id="ps" cx="${vx}" cy="${horizon - ah / 2}" r="130" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="${C.accent}" stop-opacity=".34"/><stop offset="1" stop-color="${C.accent}" stop-opacity="0"/></radialGradient>
-    <filter id="pb" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4.5"/></filter>
-    <linearGradient id="pt" x1="0" y1="${H - 150}" x2="0" y2="${H}" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="${C.bg}" stop-opacity="0"/><stop offset=".55" stop-color="${C.bg}" stop-opacity=".92"/><stop offset="1" stop-color="${C.bg}"/></linearGradient>
-  </defs>
-  <rect width="${TW}" height="${H}" fill="${C.bg}"/>
+  <defs>${active ? `<style>.cur{animation:blink 1.1s steps(1) infinite}@keyframes blink{50%{opacity:0}}${REDUCED}</style>` : ''}${g.defs}${p ? p.defs : ''}</defs>
+  <rect width="${W}" height="${H}" fill="${C.bg}"/>
   ${g.body}
-  <rect x="${vx - 44}" y="0" width="88" height="${horizon}" fill="url(#pm)"/>
-  <circle class="glow" cx="${vx}" cy="${horizon - ah / 2}" r="130" fill="url(#ps)"/>
-  <path d="M${vx - 7} ${horizon} L${vx + 7} ${horizon} L${vx + spread} ${H} L${vx - spread} ${H} Z" fill="url(#pp)"/>
-  ${slats}
-  <g class="glow">
-    <path d="${arch(0)} Z" fill="url(#pd)" opacity=".92"/>
-    <path d="${arch(5)}" fill="none" stroke="${C.accent}" stroke-width="2.6" filter="url(#pb)"/>
-    <path d="${arch(5)}" fill="none" stroke="#a796ff" stroke-width="1.3"/>
-  </g>
-  ${walker}
-  <rect y="${H - 150}" width="${TW}" height="150" fill="url(#pt)"/>
-  ${text('03 — CONTINUE', { ...T.eyebrow, x: TL, y: 44 })}
-  ${text('Walk through.', { font: F.light, size: 26, x: TL - 1, y: H - 66, tracking: -0.01 })}
-  ${text('ENTER THE SITE  →', { ...T.eyebrow, size: 10, fill: C.ink, x: TL, y: H - 32 })}`;
-  save('portal.svg', svg(TW, H, 'Walk through — enter the website', body));
+  ${p ? p.body : ''}
+  ${prompt(cmd, 44)}
+  ${lines}
+  ${prompt('', H - 30, active)}`;
+  save(file, svg(W, H, title, body));
 }
 
 heroIdentity();
 heroEclipse();
-label('label-work.svg', '01 — SELECTED WORK');
-// Every release tile shares the tallest tile's height so the grid stays square.
-const H = Math.max(...projects.map((p) => releaseLayout(p).stackY)) + 96;
-projects.forEach((p, i) => release(p, i + 1, H));
-about(H);
-portal(H);
+pane('whoami.svg', 'whoami — Pedro Rosalba', 'whoami', whoami);
+pane('now.svg', 'cat ~/.now', 'cat ~/.now', now, true, true);
