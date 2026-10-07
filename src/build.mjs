@@ -1,11 +1,11 @@
-// Renders every SVG in assets/ from src/projects.mjs.
+// Renders every SVG in assets/ from src/profile.mjs.
 // Each piece has a desktop layout (900 wide, ~1:1 in GitHub's profile column) and a
 // mobile layout (420 wide), swapped by <picture media="(max-width: …)"> in README.md.
 // Text is converted to Geist / Geist Mono outlines: GitHub serves README SVGs with
 // `default-src 'none'`, so embedded fonts would be blocked.
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import opentype from 'opentype.js';
-import { projects, interests } from './projects.mjs';
+import { interests, whoami, now } from './profile.mjs';
 
 const OUT = new URL('../assets/', import.meta.url);
 mkdirSync(OUT, { recursive: true });
@@ -238,111 +238,49 @@ function heroEclipse() {
   save('hero-b.svg', svg(W, H, 'An eclipse whose corona is drawn as an audio spectrum', body));
 }
 
-// ── section label ────────────────────────────────────────────────────────────
-function label(file, left) {
-  const W = TW, H = 48, L = TL;
-  const style = { ...T.eyebrow, fill: C.dim };
-  const body = `
-  ${text(left, { ...style, x: L, y: 30 })}
-  <line x1="${r1(L + measure(left, style) + 16)}" y1="26.5" x2="${W - L}" y2="26.5" stroke="${C.dim}" stroke-opacity=".35"/>`;
-  save(file, svg(W, H, left, body));
+// ── terminal panes ───────────────────────────────────────────────────────────
+// Two panes of one tmux-style split, under the hero: `whoami` and `cat ~/.now`;
+// only the active (right) pane has a cursor.
+// Keys, dot leaders, right-aligned values — set in Geist Mono like the site.
+const MONO = { font: F.mono, size: 12 };
+const ROW = 22;
+
+function prompt(cmd, y, cursor = false) {
+  const host = 'pedro@rosalba';
+  const hw = measure(host, MONO);
+  const sw = measure(':~$ ', MONO);
+  const cw = measure(cmd, MONO);
+  const block = cursor
+    ? `<rect class="cur" x="${r1(TL + hw + sw + cw + (cmd ? 4 : 0))}" y="${y - 10}" width="7" height="13" fill="${C.ink}"/>`
+    : '';
+  return `${text(host, { ...MONO, x: TL, y, fill: C.halo })}${text(':~$', { ...MONO, x: TL + hw, y, fill: C.mute })}${cmd ? text(cmd, { ...MONO, x: TL + hw + sw, y }) : ''}${block}`;
 }
 
-function releaseLayout(p) {
-  const blurb = wrap(p.blurb, BLURB, TW - TL * 2);
-  const stackY = 124 + (blurb.length - 1) * LH + 32;
-  return { blurb, stackY };
-}
-
-// A project tile, laid out like the website's project panels: number, title,
-// description, stack, and the site's off-white "Open project" button.
-function release(p, n, H) {
-  const { blurb, stackY } = releaseLayout(p);
-  const num = String(n).padStart(2, '0');
-  const cta = 'Open project  →';
-  const ctaStyle = { size: 13.5, fill: C.bg };
-  const bw = r1(measure(cta, ctaStyle) + 44), bh = 38, by = H - TL - bh;
-  const body = `
-  <rect width="${TW}" height="${H}" fill="${C.bg}"/>
-  ${text(`PROJECT ${num}`, { ...T.eyebrow, x: TL, y: 44 })}
-  ${text(p.title, { font: F.light, size: 26, x: TL - 1, y: 90, tracking: -0.01 })}
-  ${blurb.map((l, i) => text(l, { ...BLURB, x: TL, y: 124 + i * LH, fill: C.ink2 })).join('')}
-  ${text(p.stack.join(' · '), { font: F.mono, size: 10.5, x: TL, y: stackY, fill: C.ink3 })}
-  <rect x="${TL}" y="${by}" width="${bw}" height="${bh}" fill="${C.ink}"/>
-  ${text(cta, { ...ctaStyle, x: TL + 22, y: by + 24 })}`;
-  save(`project-${num}.svg`, svg(TW, H, `Project ${num} — ${p.title}`, body));
-}
-
-function about(H) {
-  const lines = wrap(
-    "I'm a software engineer who likes problems where correctness matters: payment engines, protocol integrations and the tooling around AI agents.",
-    BLURB,
-    TW - TL * 2,
-  );
-  const body = `
-  <rect width="${TW}" height="${H}" fill="${C.bg}"/>
-  ${text('02 — ABOUT', { ...T.eyebrow, x: TL, y: 44 })}
-  ${text('↗', { size: 15, x: TW - TL, y: 46, anchor: 'end', fill: C.dim })}
-  ${text('Systems thinking,', { font: F.light, size: 26, x: TL - 1, y: 90, tracking: -0.01 })}
-  ${text('applied across the stack.', { font: F.light, size: 26, x: TL - 1, y: 122, tracking: -0.01 })}
-  ${lines.map((l, i) => text(l, { ...BLURB, x: TL, y: 156 + i * LH, fill: C.ink2 })).join('')}
-  <line x1="${TL}" y1="${H - 84}" x2="${TW - TL}" y2="${H - 84}" stroke="${C.line}"/>
-  ${text('OPEN TO', { ...T.meta, x: TL, y: H - 58 })}
-  ${text('Conversations about software, AI and systems work.', { ...BLURB, x: TL, y: H - 32, fill: C.ink })}`;
-  save('about.svg', svg(TW, H, 'About — systems thinking, applied across the stack', body));
-}
-
-// The README ends at a door into the website, as the website's own walkway does.
-function portal(H) {
-  const vx = TW / 2, horizon = Math.round(H * 0.5);
-  const aw = 30, ah = 54, top = horizon - ah + aw / 2;
-  const arch = (o) => `M${vx - aw / 2 - o} ${horizon} V${top} A${aw / 2 + o} ${aw / 2 + o} 0 0 1 ${vx + aw / 2 + o} ${top} V${horizon}`;
-  const g = ground({ W: TW, H, horizon, id: 'p' });
-  const spread = 120;
-  const slats = [0.14, 0.32, 0.56, 0.86]
-    .map((t) => {
-      const y = horizon + t * (H - horizon), hw = 7 + t * (spread - 7);
-      return `<line x1="${r1(vx - hw)}" y1="${r1(y)}" x2="${r1(vx + hw)}" y2="${r1(y)}" stroke="${C.bg}" stroke-width="${r1(0.6 + t * 1.6)}"/>`;
+function pane(file, title, cmd, rows, active = false) {
+  const W = TW, H = 300;
+  const dot = measure('.', MONO);
+  const lines = rows
+    .map(([k, v], i) => {
+      const y = 82 + i * ROW;
+      const vw = measure(v, MONO);
+      if (!k) return text(v, { ...MONO, x: W - TL, y, anchor: 'end', fill: C.ink2 });
+      const kw = measure(k, MONO);
+      const n = Math.max(2, Math.floor((W - TL * 2 - kw - vw - 16) / dot));
+      return text(k, { ...MONO, x: TL, y, fill: C.ink3 })
+        + text('.'.repeat(n), { ...MONO, x: TL + kw + 8, y, fill: C.faint })
+        + text(v, { ...MONO, x: W - TL, y, anchor: 'end' });
     })
     .join('');
-  const fy = horizon + (H - horizon) * 0.42;
-  const walker = `<g fill="#8d8b94" transform="translate(${vx} ${r1(fy)})">
-    <circle cx="0" cy="-24" r="3"/><rect x="-3.2" y="-20" width="6.4" height="13.5" rx="1.8"/>
-    <rect x="-3" y="-7.5" width="2.5" height="12.5" rx="1.1"/><rect x="0.5" y="-7.5" width="2.5" height="12.5" rx="1.1"/></g>`;
   const body = `
-  <defs><style>.glow{animation:glow 7s ease-in-out infinite}@keyframes glow{0%,100%{opacity:.7}50%{opacity:1}}${REDUCED}</style>
-    ${g.defs}
-    <linearGradient id="pp" x1="0" y1="${horizon}" x2="0" y2="${H}" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#2c2a3b"/><stop offset="1" stop-color="#0c0c11"/></linearGradient>
-    <linearGradient id="pm" x1="0" y1="0" x2="0" y2="${horizon}" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#0d0d14" stop-opacity="0"/><stop offset=".5" stop-color="#0d0d14"/><stop offset="1" stop-color="#12121b"/></linearGradient>
-    <linearGradient id="pd" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f2eeff"/><stop offset="1" stop-color="#8f7cff"/></linearGradient>
-    <radialGradient id="ps" cx="${vx}" cy="${horizon - ah / 2}" r="130" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="${C.accent}" stop-opacity=".34"/><stop offset="1" stop-color="${C.accent}" stop-opacity="0"/></radialGradient>
-    <filter id="pb" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4.5"/></filter>
-    <linearGradient id="pt" x1="0" y1="${H - 150}" x2="0" y2="${H}" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="${C.bg}" stop-opacity="0"/><stop offset=".55" stop-color="${C.bg}" stop-opacity=".92"/><stop offset="1" stop-color="${C.bg}"/></linearGradient>
-  </defs>
-  <rect width="${TW}" height="${H}" fill="${C.bg}"/>
-  ${g.body}
-  <rect x="${vx - 44}" y="0" width="88" height="${horizon}" fill="url(#pm)"/>
-  <circle class="glow" cx="${vx}" cy="${horizon - ah / 2}" r="130" fill="url(#ps)"/>
-  <path d="M${vx - 7} ${horizon} L${vx + 7} ${horizon} L${vx + spread} ${H} L${vx - spread} ${H} Z" fill="url(#pp)"/>
-  ${slats}
-  <g class="glow">
-    <path d="${arch(0)} Z" fill="url(#pd)" opacity=".92"/>
-    <path d="${arch(5)}" fill="none" stroke="${C.accent}" stroke-width="2.6" filter="url(#pb)"/>
-    <path d="${arch(5)}" fill="none" stroke="#a796ff" stroke-width="1.3"/>
-  </g>
-  ${walker}
-  <rect y="${H - 150}" width="${TW}" height="150" fill="url(#pt)"/>
-  ${text('03 — CONTINUE', { ...T.eyebrow, x: TL, y: 44 })}
-  ${text('Walk through.', { font: F.light, size: 26, x: TL - 1, y: H - 66, tracking: -0.01 })}
-  ${text('ENTER THE SITE  →', { ...T.eyebrow, size: 10, fill: C.ink, x: TL, y: H - 32 })}`;
-  save('portal.svg', svg(TW, H, 'Walk through — enter the website', body));
+  ${active ? `<defs><style>.cur{animation:blink 1.1s steps(1) infinite}@keyframes blink{50%{opacity:0}}${REDUCED}</style></defs>` : ''}
+  <rect width="${W}" height="${H}" fill="${C.bg}"/>
+  ${prompt(cmd, 44)}
+  ${lines}
+  ${prompt('', H - 30, active)}`;
+  save(file, svg(W, H, title, body));
 }
 
 heroIdentity();
 heroEclipse();
-label('label-work.svg', '01 — SELECTED WORK');
-// Every release tile shares the tallest tile's height so the grid stays square.
-const H = Math.max(...projects.map((p) => releaseLayout(p).stackY)) + 96;
-projects.forEach((p, i) => release(p, i + 1, H));
-about(H);
-portal(H);
+pane('whoami.svg', 'whoami — Pedro Rosalba', 'whoami', whoami);
+pane('now.svg', 'cat ~/.now', 'cat ~/.now', now, true);
