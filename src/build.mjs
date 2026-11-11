@@ -5,7 +5,7 @@
 // `default-src 'none'`, so embedded fonts would be blocked.
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import opentype from 'opentype.js';
-import { whoami, now } from './profile.mjs';
+import { whoami, now, role, tagline } from './profile.mjs';
 
 const OUT = new URL('../assets/', import.meta.url);
 mkdirSync(OUT, { recursive: true });
@@ -233,7 +233,7 @@ function left() {
   const stars = Array.from({ length: 14 }, () =>
     `<circle cx="${r1(rand() * TW)}" cy="${r1(12 + rand() * 120)}" r="${r1(0.3 + rand() * 0.5)}" fill="${C.ink}" opacity="${r1(0.08 + rand() * 0.22)}"/>`).join('');
   const hx = TW + ECL.cx; // the eclipse sits in the next column; its halo spills here
-  const sentence = wrap('Drawn to low-level systems and core infrastructure — runtimes, cryptography, distributed and decentralized systems. The engines that move software.', BLURB, TW - TL * 2);
+  const sentence = wrap(tagline, BLURB, TW - TL * 2);
   const body = `
   <defs>${floor}${pool(hx)}
     <radialGradient id="spill" cx="${hx}" cy="${ECL.cy}" r="${ECL.R * 2.5}" gradientUnits="userSpaceOnUse">
@@ -244,12 +244,12 @@ function left() {
   ${stars}
   <rect width="${TW}" height="${HORIZON}" fill="url(#spill)"/>
   ${ground()}
-  ${text('SOFTWARE · AI · SYSTEMS', { ...T.eyebrow, x: TL, y: 68 })}
+  ${text(role.toUpperCase(), { ...T.eyebrow, x: TL, y: 68 })}
   ${text('Pedro', { font: F.light, size: 60, x: TL - 3, y: 138, tracking: -0.02 })}
   ${text('Rosalba', { font: F.light, size: 60, x: TL - 3, y: 198, tracking: -0.02 })}
   ${sentence.map((l, i) => text(l, { ...BLURB, x: TL, y: 240 + i * LH, fill: C.ink2 })).join('')}
   ${pane('whoami', whoami, false)}`;
-  save('left.svg', svg(TW, H, 'Pedro Rosalba — Software · AI · Systems', body));
+  save('left.svg', svg(TW, H, `Pedro Rosalba — ${role}`, body));
 }
 
 function right() {
