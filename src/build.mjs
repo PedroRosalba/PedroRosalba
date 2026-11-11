@@ -245,11 +245,9 @@ function left() {
   <rect width="${TW}" height="${HORIZON}" fill="url(#spill)"/>
   ${ground()}
   ${text(role.toUpperCase(), { ...T.eyebrow, x: TL, y: 68 })}
-  ${text('Pedro', { font: F.light, size: 60, x: TL - 3, y: 138, tracking: -0.02 })}
-  ${text('Rosalba', { font: F.light, size: 60, x: TL - 3, y: 198, tracking: -0.02 })}
-  ${sentence.map((l, i) => text(l, { ...BLURB, x: TL, y: 240 + i * LH, fill: C.ink2 })).join('')}
+  ${sentence.map((l, i) => text(l, { ...BLURB, x: TL, y: 112 + i * LH, fill: C.ink2 })).join('')}
   ${pane('whoami', whoami, false)}`;
-  save('left.svg', svg(TW, H, `Pedro Rosalba — ${role}`, body));
+  save('left.svg', svg(TW, H, role, body));
 }
 
 function right() {
